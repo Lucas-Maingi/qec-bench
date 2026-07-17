@@ -1,0 +1,42 @@
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [main]
+    paths: ["dashboard/**", "results/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage site
+        run: |
+          mkdir -p site
+          cp -r dashboard results site/
+          # Land visitors directly on the dashboard.
+          cat > site/index.html <<'EOF'
+          <!doctype html><meta http-equiv="refresh" content="0; url=dashboard/">
+          <a href="dashboard/">qec-bench dashboard</a>
+          EOF
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
