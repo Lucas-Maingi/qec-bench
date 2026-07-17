@@ -1,0 +1,14 @@
+{
+  "distance": 5,
+  "error_rates": null,
+  "hidden_sizes": [
+    256,
+    256
+  ],
+  "dropout": 0.1,
+  "epochs": 20,
+  "batch_size": 512,
+  "learning_rate": 0.001,
+  "val_fraction": 0.1,
+  "seed": 2026
+}

@@ -33,7 +33,7 @@ def _binomial_stderr(errors: int, shots: int) -> float:
 def evaluate_block(decoder_name: str, block) -> dict:
     """Run one decoder over one (distance, error_rate) block."""
     build_start = time.perf_counter()
-    decoder = build_decoder(decoder_name, block.dem)
+    decoder = build_decoder(decoder_name, block.dem, distance=block.distance)
     build_seconds = time.perf_counter() - build_start
 
     decode_start = time.perf_counter()

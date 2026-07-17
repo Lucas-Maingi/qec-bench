@@ -25,6 +25,16 @@ def _cmd_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_train(args: argparse.Namespace) -> int:
+    from qecbench.train import TrainConfig, train
+
+    configs = TrainConfig.from_yaml(args.config)
+    for config in configs:
+        out = f"{args.out}/d{config.distance}.pt"
+        train(args.data, config, out, device=args.device)
+    return 0
+
+
 def _cmd_benchmark(args: argparse.Namespace) -> int:
     from qecbench.eval import run_benchmark
 
@@ -45,6 +55,13 @@ def main(argv: list[str] | None = None) -> int:
     gen.add_argument("--config", required=True, help="path to a dataset YAML config")
     gen.add_argument("--out", default="data", help="output directory root (default: data)")
     gen.set_defaults(func=_cmd_generate)
+
+    tr = sub.add_parser("train", help="train the neural decoder (requires the [train] extra)")
+    tr.add_argument("--config", required=True, help="path to a training YAML config")
+    tr.add_argument("--data", required=True, help="path to a generated dataset root")
+    tr.add_argument("--out", default="weights", help="checkpoint directory (default: weights)")
+    tr.add_argument("--device", default=None, help="torch device (default: cuda if available)")
+    tr.set_defaults(func=_cmd_train)
 
     bench = sub.add_parser("benchmark", help="run decoders over a generated dataset")
     bench.add_argument("--dataset", required=True, help="path to a generated dataset root")
