@@ -16,6 +16,7 @@ on a laptop CPU for small distances:
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -49,6 +50,29 @@ class TrainConfig:
         raw = yaml.safe_load(Path(path).read_text())
         distances = raw.pop("distances")
         return [cls(distance=d, **raw) for d in distances]
+
+
+def _atomic_save(obj: dict, out: Path, retries: int = 3) -> None:
+    """Write a checkpoint atomically: temp file, fsync, rename over the target.
+
+    A crash mid-save can never corrupt the previous checkpoint, and writing to
+    a fresh temp file sidesteps Windows error 1224 (overwriting a file another
+    process — antivirus, indexer — has memory-mapped). The rename itself is
+    retried for the same reason.
+    """
+    tmp = out.with_suffix(out.suffix + ".tmp")
+    with open(tmp, "wb") as f:
+        torch.save(obj, f)
+        f.flush()
+        os.fsync(f.fileno())
+    for attempt in range(retries):
+        try:
+            os.replace(tmp, out)
+            return
+        except OSError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(0.5 * (attempt + 1))
 
 
 def _load_training_arrays(
@@ -179,7 +203,7 @@ def train(
             best_val_ler = val_ler
             best_model_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
 
-        torch.save(
+        _atomic_save(
             {
                 "epoch": epoch + 1,
                 "config": asdict(config),
