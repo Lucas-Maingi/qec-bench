@@ -30,6 +30,29 @@ def _binomial_stderr(errors: int, shots: int) -> float:
     return float(np.sqrt(p * (1 - p) / shots))
 
 
+_SINGLE_SHOT_SAMPLES = 1000
+
+
+def _single_shot_latency(decoder, detection_events: np.ndarray) -> dict:
+    """Decode shots one at a time to measure streaming latency percentiles.
+
+    Batch throughput hides per-call overhead; a real-time decoder is invoked
+    per syndrome-extraction round, so the single-shot distribution is the
+    honest latency number. Uses the first N shots (already in random order).
+    """
+    n = min(_SINGLE_SHOT_SAMPLES, detection_events.shape[0])
+    times = np.empty(n)
+    for i in range(n):
+        start = time.perf_counter()
+        decoder.decode_batch(detection_events[i : i + 1])
+        times[i] = time.perf_counter() - start
+    return {
+        "single_shot_samples": n,
+        "single_shot_p50_us": float(np.percentile(times, 50) * 1e6),
+        "single_shot_p99_us": float(np.percentile(times, 99) * 1e6),
+    }
+
+
 def evaluate_block(decoder_name: str, block) -> dict:
     """Run one decoder over one (distance, error_rate) block."""
     build_start = time.perf_counter()
@@ -55,6 +78,7 @@ def evaluate_block(decoder_name: str, block) -> dict:
         "build_seconds": build_seconds,
         "decode_seconds": decode_seconds,
         "us_per_shot": decode_seconds / shots * 1e6,
+        **_single_shot_latency(decoder, block.detection_events),
     }
 
 

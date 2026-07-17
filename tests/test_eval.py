@@ -19,6 +19,8 @@ def test_run_benchmark_document(dataset_root, tmp_path):
     assert cell["logical_errors"] == round(cell["logical_error_rate"] * cell["shots"])
     assert cell["stderr"] > 0
     assert cell["us_per_shot"] > 0
+    assert cell["single_shot_samples"] == 1000
+    assert 0 < cell["single_shot_p50_us"] <= cell["single_shot_p99_us"]
 
 
 def test_run_benchmark_multiple_decoders(dataset_root):

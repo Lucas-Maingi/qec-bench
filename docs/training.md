@@ -38,6 +38,23 @@ qecbench train --config configs/train/mlp_v1.yaml --data data/train_v1 --out wei
 Works on a laptop CPU (~15–90 s/epoch depending on distance) and on any
 CUDA device unchanged (`--device cuda`).
 
+Two configs ship: `mlp_v1.yaml` (2×256 hidden, 20 epochs — the pipeline
+validation baseline) and `mlp_v2.yaml` (512×256, 30 epochs, lower dropout —
+more capacity for d≥5, where v1 underfits). Inference always uses the
+best-validation-LER weights stored in the checkpoint, not the final epoch's.
+
+## Free GPU tier: Kaggle
+
+For training runs beyond what the laptop handles, this project standardizes
+on **Kaggle** (30 GPU-hours/week, quota independent of Colab):
+`notebooks/train_kaggle.ipynb`. Enable GPU + Internet in the notebook
+settings. Progress persists via the notebook's committed output — attach a
+previous run's output as an input dataset and Run All to resume; finished
+distances skip, interrupted ones continue from the last epoch.
+
+`notebooks/train_colab.ipynb` (Drive-backed) is kept as an alternative for
+when Colab quota is available.
+
 ## Checkpointing and resumability
 
 Training is designed for interruptible free-tier compute (Colab/Kaggle

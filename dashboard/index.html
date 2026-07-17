@@ -16,7 +16,8 @@
     --border: rgba(11,11,11,0.10);
     --series-1: #2a78d6; /* pymatching */
     --series-2: #1baf7a; /* fusion_blossom */
-    --series-3: #eda100; /* neural */
+    --series-3: #eda100; /* neural v1 */
+    --series-4: #008300; /* neural v2 */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -31,6 +32,7 @@
       --series-1: #3987e5;
       --series-2: #199e70;
       --series-3: #c98500;
+      --series-4: #008300;
     }
   }
   * { box-sizing: border-box; margin: 0; }
@@ -149,12 +151,14 @@
 "use strict";
 
 const DECODER_META = {
-  pymatching:     { label: "PyMatching",     color: "var(--series-1)" },
-  fusion_blossom: { label: "Fusion Blossom", color: "var(--series-2)" },
+  pymatching:         { label: "PyMatching",    color: "var(--series-1)" },
+  fusion_blossom:     { label: "Fusion Blossom", color: "var(--series-2)" },
+  "neural:weights":    { label: "Neural MLP v1", color: "var(--series-3)" },
+  "neural:weights_v2": { label: "Neural MLP v2", color: "var(--series-4)" },
 };
 function decoderMeta(name) {
   if (DECODER_META[name]) return DECODER_META[name];
-  if (name.startsWith("neural")) return { label: "Neural (qec-bench)", color: "var(--series-3)" };
+  if (name.startsWith("neural")) return { label: `Neural (${name.split(":")[1] || "?"})`, color: "var(--series-3)" };
   return { label: name, color: "var(--muted)" };
 }
 
@@ -388,7 +392,9 @@ function renderLatency(results) {
 
 function renderTable(results) {
   const table = document.getElementById("results-table");
-  const header = ["decoder", "d", "p", "shots", "logical errors", "LER", "std err", "µs/shot"];
+  const hasSingle = results.some(c => c.single_shot_p50_us !== undefined);
+  const header = ["decoder", "d", "p", "shots", "logical errors", "LER", "std err", "µs/shot",
+                  ...(hasSingle ? ["1-shot p50 µs", "1-shot p99 µs"] : [])];
   const thead = document.createElement("thead");
   const tr = document.createElement("tr");
   for (const h of header) {
@@ -408,6 +414,10 @@ function renderTable(results) {
       c.logical_error_rate === 0 ? "0" : fmt.sci(c.logical_error_rate),
       c.stderr === 0 ? "—" : fmt.sci(c.stderr),
       fmt.us(c.us_per_shot),
+      ...(hasSingle ? [
+        c.single_shot_p50_us === undefined ? "—" : fmt.us(c.single_shot_p50_us),
+        c.single_shot_p99_us === undefined ? "—" : fmt.us(c.single_shot_p99_us),
+      ] : []),
     ];
     for (const v of vals) {
       const td = document.createElement("td");

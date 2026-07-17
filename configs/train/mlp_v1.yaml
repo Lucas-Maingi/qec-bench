@@ -1,7 +1,7 @@
 # Neural decoder v1: per-distance MLPs over the flattened syndrome.
 # Small enough to train on a laptop CPU at these distances; the same config
 # runs unchanged on a Colab/Kaggle GPU for larger datasets.
-distances: [3, 5]
+distances: [3, 5, 7]
 hidden_sizes: [256, 256]
 dropout: 0.1
 epochs: 20

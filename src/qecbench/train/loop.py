@@ -120,17 +120,23 @@ def train(
     loss_fn = nn.BCEWithLogitsLoss()
 
     start_epoch = 0
+    best_val_ler = float("inf")
+    best_model_state = None
     if checkpoint is not None:
         model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         start_epoch = checkpoint["epoch"]
+        best_val_ler = checkpoint.get("best_val_ler", float("inf"))
+        best_model_state = checkpoint.get("best_model_state")
         print(f"d={config.distance}: resuming from epoch {start_epoch}")
 
     (run_dir / f"{out.stem}_config.json").write_text(json.dumps(asdict(config), indent=2))
     torch.manual_seed(config.seed + start_epoch)
 
-    x_train_t = torch.from_numpy(x_train.astype(np.float32))
-    y_train_t = torch.from_numpy(y_train.astype(np.float32))
+    # Keep the training set as uint8 and cast per-batch: a float32 copy of a
+    # large-distance dataset would not fit comfortably in 8 GB of RAM.
+    x_train_t = torch.from_numpy(x_train.astype(np.uint8))
+    y_train_t = torch.from_numpy(y_train.astype(np.uint8))
 
     for epoch in range(start_epoch, config.epochs):
         epoch_start = time.perf_counter()
@@ -139,8 +145,8 @@ def train(
         total_loss, batches = 0.0, 0
         for i in range(0, len(perm), config.batch_size):
             idx = perm[i : i + config.batch_size]
-            xb = x_train_t[idx].to(device)
-            yb = y_train_t[idx].to(device)
+            xb = x_train_t[idx].to(device).float()
+            yb = y_train_t[idx].to(device).float()
             optimizer.zero_grad()
             loss = loss_fn(model(xb), yb)
             loss.backward()
@@ -169,6 +175,10 @@ def train(
             f"val_LER={val_ler:.4f}  ({record['seconds']:.1f}s)"
         )
 
+        if val_ler <= best_val_ler:
+            best_val_ler = val_ler
+            best_model_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+
         torch.save(
             {
                 "epoch": epoch + 1,
@@ -177,6 +187,10 @@ def train(
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
                 "val_ler": val_ler,
+                # Inference uses the best-validation weights, not the last
+                # epoch's: late epochs can overfit (seen at d=5 in v1).
+                "best_val_ler": best_val_ler,
+                "best_model_state": best_model_state,
             },
             out,
         )

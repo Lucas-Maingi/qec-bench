@@ -1,0 +1,12 @@
+# Neural decoder v2: more capacity and training time for the distances where
+# v1 clearly underfit (d=5, d=7), lower dropout, best-validation checkpoint
+# selection. Still CPU-trainable (~1h total on a laptop); a Kaggle T4 does it
+# in minutes.
+distances: [3, 5, 7]
+hidden_sizes: [512, 256]
+dropout: 0.05
+epochs: 30
+batch_size: 512
+learning_rate: 0.001
+val_fraction: 0.1
+seed: 2026

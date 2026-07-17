@@ -30,8 +30,15 @@ class NeuralDecoder(Decoder):
     def from_checkpoint(cls, path: str | Path) -> NeuralDecoder:
         checkpoint = torch.load(Path(path), map_location="cpu", weights_only=True)
         model = SyndromeMLP.from_hyperparameters(checkpoint["hyperparameters"])
-        model.load_state_dict(checkpoint["model_state"])
-        meta = {k: v for k, v in checkpoint.items() if k not in ("model_state", "optimizer_state")}
+        # Prefer the best-validation weights; fall back to the final epoch for
+        # checkpoints written before best-state tracking existed.
+        state = checkpoint.get("best_model_state") or checkpoint["model_state"]
+        model.load_state_dict(state)
+        meta = {
+            k: v
+            for k, v in checkpoint.items()
+            if k not in ("model_state", "optimizer_state", "best_model_state")
+        }
         return cls(model, checkpoint_meta=meta)
 
     @torch.no_grad()

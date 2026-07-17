@@ -70,6 +70,18 @@ def test_build_decoder_neural_spec(checkpoint, block):
         build_decoder(f"neural:{path.parent}", block.dem)
 
 
+def test_checkpoint_tracks_best_validation_state(checkpoint):
+    path, _ = checkpoint
+    ckpt = torch.load(path, map_location="cpu", weights_only=True)
+    assert ckpt["best_val_ler"] <= ckpt["val_ler"]
+    assert ckpt["best_model_state"] is not None
+    metrics = (path.parent / "d3_metrics.jsonl").read_text().strip().splitlines()
+    import json
+
+    best_seen = min(json.loads(line)["val_ler"] for line in metrics)
+    assert ckpt["best_val_ler"] == pytest.approx(best_seen)
+
+
 def test_neural_from_dem_is_rejected(block):
     with pytest.raises(TypeError, match="trained weights"):
         NeuralDecoder.from_dem(block.dem)

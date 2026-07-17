@@ -1,0 +1,10 @@
+# Training data for the neural decoder. Same grid as benchmark_v1 but a
+# DIFFERENT seed: models must never be evaluated on shots they trained on.
+name: train_v1
+code_task: surface_code:rotated_memory_z
+noise_model: circuit_depolarizing
+distances: [3, 5, 7]
+rounds: distance
+error_rates: [0.001, 0.002, 0.003, 0.005, 0.008, 0.01]
+shots: 100000
+seed: 31337
