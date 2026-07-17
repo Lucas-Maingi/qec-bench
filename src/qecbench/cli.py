@@ -43,6 +43,13 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_report(args: argparse.Namespace) -> int:
+    from qecbench.eval.report import report
+
+    print(report(args.results))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="qecbench",
@@ -72,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     bench.add_argument("--out", default=None, help="path for the results JSON")
     bench.set_defaults(func=_cmd_benchmark)
+
+    rep = sub.add_parser("report", help="render a results JSON as markdown tables")
+    rep.add_argument("results", help="path to a benchmark results JSON")
+    rep.set_defaults(func=_cmd_report)
 
     args = parser.parse_args(argv)
     return args.func(args)
