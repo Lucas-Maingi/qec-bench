@@ -1,0 +1,136 @@
+# qec-bench: an open, reproducible benchmark for surface-code decoders (and a neural decoder that runs on your laptop)
+
+*Lucas Maingi, July 2026*
+
+## The gap
+
+Quantum error correction decoding has a strange open-source landscape right
+now. The classical baselines are excellent and open:
+[PyMatching](https://github.com/oscarhiggott/PyMatching) and
+[Fusion Blossom](https://github.com/yuewuo/fusion-blossom) both implement
+minimum-weight perfect matching (MWPM) with fast native cores, and everyone
+benchmarks against them. The headline *neural* decoders are a different story:
+Google DeepMind's AlphaQubit results are landmark papers without an
+installable package or public weights, and NVIDIA's open-source neural decoder
+release is built around GPU inference.
+
+So two things are missing. First, a **neutral, reproducible benchmark
+harness** — not a table in someone's paper, but a tool you can run yourself
+that produces logical error rates *and* latency for every open decoder under
+identical, versioned noise models. Second, a neural decoder that is **small,
+documented, and CPU-practical** — something you can `pip install` and study,
+not a artifact you can only read about.
+
+[qec-bench](https://github.com/Lucas-Maingi/qec-bench) is my attempt at both.
+To be clear about positioning: I am not trying to out-train DeepMind or
+NVIDIA. The benchmark suite is the product; the neural decoder is a rigorous,
+honest baseline that demonstrates the full ML engineering lifecycle around it.
+
+## What it does
+
+One config-driven pipeline, three commands:
+
+```bash
+qecbench generate  --config configs/datasets/benchmark_v1.yaml --out data
+qecbench train     --config configs/train/mlp_v1.yaml --data data/train_v1 --out weights
+qecbench benchmark --dataset data/benchmark_v1 \
+    --decoders "pymatching,fusion_blossom,neural:weights" \
+    --out results/benchmark_v1.json
+```
+
+- **Data**: rotated surface-code memory experiments sampled with
+  [Stim](https://github.com/quantumlib/Stim) under circuit-level depolarizing
+  noise, across distances 3/5/7 and six physical error rates. Every dataset is
+  described by a YAML config that is validated, content-hashed, and embedded
+  in the output metadata; generation is seeded per block and bit-reproducible.
+- **Decoders** implement one interface (`decode_batch: detection events →
+  predicted observable flips`). PyMatching consumes the Stim detector error
+  model natively; for Fusion Blossom I convert the DEM into its
+  integer-weighted graph format. The neural decoder is a deliberately small
+  per-distance MLP (~150k parameters at d=7).
+- **The harness** scores every decoder on every (distance, error-rate) cell —
+  200,000 shots each — and emits a single results JSON with raw error counts,
+  binomial error bars, per-shot latency, and full provenance (config hash,
+  library versions, host hardware). Training and evaluation datasets use
+  different seeds; no decoder is ever scored on shots it trained on.
+- **A static dashboard** (no build step, no external dependencies) renders
+  that JSON: log-log logical-error-rate curves per distance, a CPU latency
+  plot, and the complete results table.
+
+## Results, including the losses
+
+Selected cells from `results/benchmark_v1.json` (200,000 shots each,
+circuit-level depolarizing noise, measured on a 6th-gen i7 laptop CPU;
+PyMatching and Fusion Blossom agree to within counting noise everywhere, so
+one MWPM column is shown):
+
+| d | p | MWPM LER | Neural LER | MWPM µs/shot | Neural µs/shot |
+|---|-------|----------|-----------|------|------|
+| 3 | 0.001 | 7.8×10⁻⁴ | **6.6×10⁻⁴** | 0.3 | 5.0 |
+| 3 | 0.01  | 5.88×10⁻² | **5.74×10⁻²** | 1.1 | 3.2 |
+| 5 | 0.001 | **1.4×10⁻⁴** | 1.2×10⁻³ | 0.8 | 3.8 |
+| 5 | 0.01  | **8.30×10⁻²** | 2.06×10⁻¹ | 16.9 | 5.4 |
+| 7 | 0.001 | **3.5×10⁻⁵** | 8.0×10⁻³ | 4.9 | 9.0 |
+| 7 | 0.01  | **1.03×10⁻¹** | 4.29×10⁻¹ | 49.7 | 7.6 |
+
+The neural decoder wins every distance-3 cell outright, degrades to roughly
+2.5× worse at distance 5, and loses decisively at distance 7. Its latency is
+nearly flat in distance and error rate, while matching slows as syndromes get
+denser — at d=7 near threshold the MLP decodes ~6× faster than PyMatching.
+
+One more result the pipeline itself produced: an earlier informal run had
+evaluated models on the same generated shots they trained on, and looked
+substantially better at d=5. The disjoint-seed train/benchmark split exposed
+that as leakage. That is what the rigor is *for*.
+
+Three honest observations from the v1 numbers:
+
+1. **MWPM is a strong baseline and PyMatching is absurdly fast.** Sub-2µs
+   per shot at d=3 on a 2016 laptop core. Any neural decoder pitch that
+   ignores this latency bar is incomplete.
+2. **The small MLP is competitive near threshold at low distance** — it can
+   exploit correlations in the noise that the matching approximation throws
+   away — **and degrades at larger distance and low error rates**, where its
+   fixed training sample contains too few error events. Both regimes are in
+   the dashboard; neither is cherry-picked away.
+3. **Engineering constraints are results too.** The shipped model decodes in
+   single-digit microseconds per shot on CPU, installs with `pip`, and trains
+   to reproduction in ~40 minutes on a laptop — no GPU required at these
+   distances. That is the niche the big-lab releases leave open.
+
+## The ML engineering underneath
+
+The project is structured to make the lifecycle visible, because that's the
+point:
+
+- **Versioned data pipeline** — configs are the source of truth; datasets
+  carry their config hash and library versions; interrupted generation
+  resumes per block.
+- **Experiment tracking** — every training run writes its resolved config and
+  a JSONL metrics line per epoch next to the checkpoint. Plain files:
+  greppable, diffable, no tracking server.
+- **Checkpointed, resumable training** — finished stages skip in
+  milliseconds; interrupted runs resume from the last epoch; resuming with a
+  mismatched config is an error. The included Colab notebook writes
+  checkpoints directly to Drive so a free-tier disconnect costs at most one
+  epoch.
+- **One-command reproduction** — the results file, and every chart on the
+  dashboard, regenerates from the commands above; the provenance footer tells
+  you exactly how.
+- **Tests and CI** — the public API, the data pipeline's determinism and
+  resume behavior, decoder correctness (including cross-checking the two MWPM
+  implementations against each other), and the harness schema are all under
+  pytest, run with lint on every push.
+
+## What's next
+
+- Scale the training configs on free GPU tiers (the pipeline is ready; the
+  quota is the bottleneck).
+- A graph-structured model behind the same `Decoder` interface, so the
+  benchmark can say something about *architecture*, not just this MLP.
+- Best-effort CPU evaluation of NVIDIA's released model, or a documented
+  explanation of why it's excluded from the CPU-latency comparison, with
+  their published numbers cited for context.
+
+If you work on QEC decoders and want your decoder in the comparison, the
+`Decoder` interface is ~10 lines to implement — issues and PRs welcome.

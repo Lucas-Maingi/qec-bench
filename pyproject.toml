@@ -41,6 +41,9 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# Notebook cells are deliberately Colab-idiomatic (shell magics, imports
+# after drive.mount); lint rules for library code don't apply there.
+exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
