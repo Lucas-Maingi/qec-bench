@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qecbench"
+version = "0.1.0"
+description = "Reproducible benchmark suite and lightweight CPU-friendly neural decoder for surface-code quantum error correction"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Lucas Maingi", email = "maingilucas0@gmail.com" }]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "stim>=1.13",
+    "pymatching>=2.1",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+fusion = ["fusion-blossom>=0.2"]
+train = ["torch>=2.1"]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+
+[project.scripts]
+qecbench = "qecbench.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Lucas-Maingi/qec-bench"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
