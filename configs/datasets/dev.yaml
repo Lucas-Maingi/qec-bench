@@ -1,0 +1,10 @@
+# Small dataset for local development and CI smoke tests.
+# Generates in seconds on a laptop CPU.
+name: dev
+code_task: surface_code:rotated_memory_z
+noise_model: circuit_depolarizing
+distances: [3, 5]
+rounds: distance
+error_rates: [0.001, 0.005, 0.01]
+shots: 20000
+seed: 2026
