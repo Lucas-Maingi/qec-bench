@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qec-bench — surface-code decoder benchmark</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; /* pymatching */
+    --series-2: #1baf7a; /* fusion_blossom */
+    --series-3: #eda100; /* neural */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #199e70;
+      --series-3: #c98500;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 32px 24px 64px;
+    max-width: 1060px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 24px; font-weight: 650; }
+  .subtitle { color: var(--text-secondary); margin-top: 6px; max-width: 70ch; line-height: 1.5; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; min-width: 150px; flex: 1;
+  }
+  .tile .label { font-size: 13px; color: var(--text-secondary); }
+  .tile .value { font-size: 26px; font-weight: 600; margin-top: 4px; }
+  .tile .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .card h2 { font-size: 16px; font-weight: 600; }
+  .card .desc { font-size: 13px; color: var(--text-secondary); margin: 4px 0 14px; line-height: 1.5; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .swatch-line { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+  .legend .swatch-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; }
+  .panel-title { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 2px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: inherit; font-size: 11px; fill: var(--muted); }
+  svg .axis-label { font-size: 11.5px; fill: var(--text-secondary); }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .axisline { stroke: var(--baseline); stroke-width: 1; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  td:first-child { color: var(--text-primary); }
+  .provenance { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .provenance code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+  #tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14); padding: 9px 12px; font-size: 12.5px;
+  }
+  #tooltip .tt-title { color: var(--text-secondary); margin-bottom: 5px; }
+  #tooltip .tt-row { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+  #tooltip .tt-key { width: 12px; height: 2px; border-radius: 1px; }
+  #tooltip .tt-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #tooltip .tt-name { color: var(--text-secondary); }
+  #load-error { display: none; padding: 24px; }
+  #load-error input { margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1>qec-bench</h1>
+  <p class="subtitle">
+    Reproducible benchmark of surface-code decoders — classical minimum-weight
+    perfect matching baselines (PyMatching, Fusion Blossom) against a small
+    CPU-friendly neural decoder — under standardized circuit-level depolarizing
+    noise generated with Stim. Every number below regenerates from one command.
+  </p>
+
+  <div id="load-error" class="card">
+    <h2>Results file not found</h2>
+    <p class="desc">
+      This page reads <code>results/benchmark_v1.json</code>. If you opened the
+      file directly from disk, either serve the repo (<code>python -m http.server</code>)
+      or pick a results file:
+    </p>
+    <input type="file" accept=".json" id="file-input">
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card">
+      <h2>Logical error rate vs physical error rate</h2>
+      <p class="desc">
+        Lower is better. One panel per code distance; both axes logarithmic.
+        Points with zero observed logical errors are shown at the plot floor
+        with an open marker.
+      </p>
+      <div class="legend" id="legend-ler"></div>
+      <div class="panels" id="ler-panels"></div>
+    </div>
+
+    <div class="card">
+      <h2>Decode latency on CPU</h2>
+      <p class="desc">
+        Mean time to decode one shot (batch decoding, single CPU core;
+        logarithmic axis). Measured on the same host that produced the accuracy
+        numbers — hardware details in the provenance footer.
+      </p>
+      <div class="legend" id="legend-lat"></div>
+      <div id="latency-plot"></div>
+    </div>
+
+    <div class="card">
+      <h2>All measurements</h2>
+      <p class="desc">Every benchmark cell in the results file.</p>
+      <div style="overflow-x:auto"><table id="results-table"></table></div>
+    </div>
+
+    <div class="card provenance" id="provenance"></div>
+  </div>
+
+  <div id="tooltip"></div>
+
+<script>
+"use strict";
+
+const DECODER_META = {
+  pymatching:     { label: "PyMatching",     color: "var(--series-1)" },
+  fusion_blossom: { label: "Fusion Blossom", color: "var(--series-2)" },
+};
+function decoderMeta(name) {
+  if (DECODER_META[name]) return DECODER_META[name];
+  if (name.startsWith("neural")) return { label: "Neural (qec-bench)", color: "var(--series-3)" };
+  return { label: name, color: "var(--muted)" };
+}
+
+const fmt = {
+  sci(x) {
+    if (x === 0) return "0";
+    const e = Math.floor(Math.log10(x));
+    const m = x / 10 ** e;
+    return `${m.toFixed(1)}×10^${e}`;
+  },
+  us(x) { return x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2); },
+  count(x) { return x.toLocaleString("en-US"); },
+};
+
+const tooltip = document.getElementById("tooltip");
+function showTooltip(evt, title, rows) {
+  tooltip.replaceChildren();
+  const t = document.createElement("div");
+  t.className = "tt-title";
+  t.textContent = title;
+  tooltip.appendChild(t);
+  for (const r of rows) {
+    const div = document.createElement("div");
+    div.className = "tt-row";
+    const key = document.createElement("span");
+    key.className = "tt-key";
+    key.style.background = r.color;
+    const val = document.createElement("span");
+    val.className = "tt-value";
+    val.textContent = r.value;
+    const name = document.createElement("span");
+    name.className = "tt-name";
+    name.textContent = r.name;
+    div.append(key, val, name);
+    tooltip.appendChild(div);
+  }
+  tooltip.style.display = "block";
+  const pad = 14;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  const r = tooltip.getBoundingClientRect();
+  if (x + r.width > innerWidth - 8) x = evt.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = evt.clientY - r.height - pad;
+  tooltip.style.left = x + "px";
+  tooltip.style.top = y + "px";
+}
+function hideTooltip() { tooltip.style.display = "none"; }
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+
+function buildLegend(container, names, marker) {
+  container.replaceChildren();
+  for (const n of names) {
+    const meta = decoderMeta(n);
+    const key = document.createElement("span");
+    key.className = "key";
+    const sw = document.createElement("span");
+    sw.className = marker === "dot" ? "swatch-dot" : "swatch-line";
+    sw.style.background = meta.color;
+    const label = document.createElement("span");
+    label.textContent = meta.label;
+    key.append(sw, label);
+    container.appendChild(key);
+  }
+}
+
+/* ---------- LER small multiples ---------- */
+
+function lerPanel(cells, decoders, distance, yDomain) {
+  const W = 330, H = 260, m = { l: 46, r: 14, t: 10, b: 38 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
+
+  const ps = [...new Set(cells.map(c => c.error_rate))].sort((a, b) => a - b);
+  const xs = p => m.l + (Math.log10(p) - Math.log10(ps[0])) /
+                  (Math.log10(ps.at(-1)) - Math.log10(ps[0])) * iw;
+  const [y0, y1] = yDomain; // log10 bounds
+  const floor = y0;
+  const ys = v => {
+    const lv = v === 0 ? floor : Math.max(floor, Math.log10(v));
+    return m.t + (y1 - lv) / (y1 - floor) * ih;
+  };
+
+  for (let e = Math.ceil(floor); e <= y1; e++) {
+    const y = ys(10 ** e);
+    svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, class: "gridline" }));
+    const t = svgEl("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end" });
+    t.textContent = `1e${e}`;
+    svg.appendChild(t);
+  }
+  svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, class: "axisline" }));
+  for (const p of ps) {
+    const t = svgEl("text", { x: xs(p), y: m.t + ih + 16, "text-anchor": "middle" });
+    t.textContent = p;
+    svg.appendChild(t);
+  }
+  const xl = svgEl("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis-label" });
+  xl.textContent = "physical error rate p";
+  svg.appendChild(xl);
+
+  for (const name of decoders) {
+    const meta = decoderMeta(name);
+    const pts = ps.map(p => cells.find(c => c.decoder === name && c.error_rate === p)).filter(Boolean);
+    const path = pts.map((c, i) =>
+      `${i ? "L" : "M"}${xs(c.error_rate).toFixed(1)},${ys(c.logical_error_rate).toFixed(1)}`).join("");
+    svg.appendChild(svgEl("path", {
+      d: path, fill: "none", stroke: meta.color,
+      "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+    for (const c of pts) {
+      const zero = c.logical_error_rate === 0;
+      svg.appendChild(svgEl("circle", {
+        cx: xs(c.error_rate), cy: ys(c.logical_error_rate), r: 4,
+        fill: zero ? "var(--surface-1)" : meta.color,
+        stroke: zero ? meta.color : "var(--surface-1)", "stroke-width": 2,
+      }));
+    }
+  }
+
+  // Crosshair + shared tooltip: nearest p column.
+  const hair = svgEl("line", { y1: m.t, y2: m.t + ih, class: "axisline", visibility: "hidden" });
+  svg.appendChild(hair);
+  const hit = svgEl("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+  hit.addEventListener("pointermove", evt => {
+    const rect = svg.getBoundingClientRect();
+    const px = (evt.clientX - rect.left) / rect.width * W;
+    let best = ps[0];
+    for (const p of ps) if (Math.abs(xs(p) - px) < Math.abs(xs(best) - px)) best = p;
+    hair.setAttribute("x1", xs(best));
+    hair.setAttribute("x2", xs(best));
+    hair.setAttribute("visibility", "visible");
+    const rows = decoders.map(name => {
+      const c = cells.find(k => k.decoder === name && k.error_rate === best);
+      if (!c) return null;
+      const meta = decoderMeta(name);
+      const err = c.logical_error_rate === 0
+        ? `0 errors in ${fmt.count(c.shots)} shots`
+        : `LER ${fmt.sci(c.logical_error_rate)}`;
+      return { color: meta.color, value: err, name: meta.label };
+    }).filter(Boolean);
+    showTooltip(evt, `d=${distance}, p=${best}`, rows);
+  });
+  hit.addEventListener("pointerleave", () => { hair.setAttribute("visibility", "hidden"); hideTooltip(); });
+  svg.appendChild(hit);
+  return svg;
+}
+
+function renderLER(results) {
+  const decoders = [...new Set(results.map(c => c.decoder))];
+  buildLegend(document.getElementById("legend-ler"), decoders, "line");
+  const distances = [...new Set(results.map(c => c.distance))].sort((a, b) => a - b);
+  const nonzero = results.filter(c => c.logical_error_rate > 0).map(c => c.logical_error_rate);
+  const shots = Math.max(...results.map(c => c.shots));
+  const yMin = Math.min(Math.log10(1 / shots), ...nonzero.map(Math.log10)) - 0.3;
+  const yMax = Math.max(...nonzero.map(Math.log10)) + 0.2;
+  const container = document.getElementById("ler-panels");
+  for (const d of distances) {
+    const wrap = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "panel-title";
+    title.textContent = `distance ${d}`;
+    wrap.appendChild(title);
+    wrap.appendChild(lerPanel(results.filter(c => c.distance === d), decoders, d, [yMin, yMax]));
+    container.appendChild(wrap);
+  }
+}
+
+/* ---------- Latency dot plot ---------- */
+
+function renderLatency(results) {
+  const decoders = [...new Set(results.map(c => c.decoder))];
+  buildLegend(document.getElementById("legend-lat"), decoders, "dot");
+  const distances = [...new Set(results.map(c => c.distance))].sort((a, b) => a - b);
+
+  const W = 1000, rowH = 34, m = { l: 90, r: 30, t: 8, b: 40 };
+  const H = m.t + rowH * distances.length + m.b;
+  const iw = W - m.l - m.r;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
+
+  const lats = results.map(c => c.us_per_shot);
+  const lmin = Math.floor(Math.log10(Math.min(...lats)));
+  const lmax = Math.ceil(Math.log10(Math.max(...lats)));
+  const xs = v => m.l + (Math.log10(v) - lmin) / (lmax - lmin) * iw;
+
+  for (let e = lmin; e <= lmax; e++) {
+    const x = xs(10 ** e);
+    svg.appendChild(svgEl("line", { x1: x, x2: x, y1: m.t, y2: H - m.b, class: "gridline" }));
+    const t = svgEl("text", { x, y: H - m.b + 16, "text-anchor": "middle" });
+    t.textContent = 10 ** e >= 1 ? `${fmt.count(10 ** e)}` : `${10 ** e}`;
+    svg.appendChild(t);
+  }
+  const xl = svgEl("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis-label" });
+  xl.textContent = "µs per shot (log scale)";
+  svg.appendChild(xl);
+
+  distances.forEach((d, i) => {
+    const cy = m.t + rowH * i + rowH / 2;
+    const t = svgEl("text", { x: m.l - 12, y: cy + 3.5, "text-anchor": "end", class: "axis-label" });
+    t.textContent = `d = ${d}`;
+    svg.appendChild(t);
+    for (const name of decoders) {
+      const cells = results.filter(c => c.distance === d && c.decoder === name);
+      if (!cells.length) continue;
+      const meta = decoderMeta(name);
+      const worst = Math.max(...cells.map(c => c.us_per_shot));
+      const best = Math.min(...cells.map(c => c.us_per_shot));
+      svg.appendChild(svgEl("line", {
+        x1: xs(best), x2: xs(worst), y1: cy, y2: cy,
+        stroke: meta.color, "stroke-width": 2, "stroke-linecap": "round", opacity: 0.45,
+      }));
+      const dot = svgEl("circle", {
+        cx: xs(worst), cy, r: 5, fill: meta.color,
+        stroke: "var(--surface-1)", "stroke-width": 2,
+      });
+      const hit = svgEl("circle", { cx: xs(worst), cy, r: 14, fill: "transparent" });
+      hit.addEventListener("pointermove", evt => showTooltip(evt, `${meta.label}, d=${d}`, [
+        { color: meta.color, value: `${fmt.us(worst)} µs/shot`, name: "worst across p" },
+        { color: meta.color, value: `${fmt.us(best)} µs/shot`, name: "best across p" },
+      ]));
+      hit.addEventListener("pointerleave", hideTooltip);
+      svg.append(dot, hit);
+    }
+  });
+  document.getElementById("latency-plot").appendChild(svg);
+}
+
+/* ---------- Table, tiles, provenance ---------- */
+
+function renderTable(results) {
+  const table = document.getElementById("results-table");
+  const header = ["decoder", "d", "p", "shots", "logical errors", "LER", "std err", "µs/shot"];
+  const thead = document.createElement("thead");
+  const tr = document.createElement("tr");
+  for (const h of header) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    tr.appendChild(th);
+  }
+  thead.appendChild(tr);
+  const tbody = document.createElement("tbody");
+  const sorted = [...results].sort((a, b) =>
+    a.distance - b.distance || a.error_rate - b.error_rate || a.decoder.localeCompare(b.decoder));
+  for (const c of sorted) {
+    const row = document.createElement("tr");
+    const vals = [
+      decoderMeta(c.decoder).label, c.distance, c.error_rate, fmt.count(c.shots),
+      fmt.count(c.logical_errors),
+      c.logical_error_rate === 0 ? "0" : fmt.sci(c.logical_error_rate),
+      c.stderr === 0 ? "—" : fmt.sci(c.stderr),
+      fmt.us(c.us_per_shot),
+    ];
+    for (const v of vals) {
+      const td = document.createElement("td");
+      td.textContent = v;
+      row.appendChild(td);
+    }
+    tbody.appendChild(row);
+  }
+  table.append(thead, tbody);
+}
+
+function renderTiles(doc) {
+  const results = doc.results;
+  const tiles = document.getElementById("tiles");
+  const shots = results.reduce((s, c) => s + c.shots, 0);
+  const neural = results.filter(c => c.decoder.startsWith("neural"));
+  const neuralWorst = neural.length ? Math.max(...neural.map(c => c.us_per_shot)) : null;
+  const defs = [
+    { label: "Decoders compared", value: new Set(results.map(c => c.decoder)).size,
+      sub: [...new Set(results.map(c => decoderMeta(c.decoder).label))].join(" · ") },
+    { label: "Shots decoded", value: (shots / 1e6).toFixed(1) + "M",
+      sub: `${new Set(results.map(c => c.distance)).size} distances × ${new Set(results.map(c => c.error_rate)).size} error rates` },
+    ...(neuralWorst !== null ? [{
+      label: "Neural decoder CPU latency", value: `${fmt.us(neuralWorst)} µs`,
+      sub: "per shot, worst benchmark cell" }] : []),
+    { label: "Dataset", value: doc.dataset.name, sub: `config ${doc.dataset.config_hash}` },
+  ];
+  for (const d of defs) {
+    const el = document.createElement("div");
+    el.className = "tile";
+    for (const [cls, text] of [["label", d.label], ["value", d.value], ["sub", d.sub]]) {
+      const span = document.createElement("div");
+      span.className = cls;
+      span.textContent = text;
+      el.appendChild(span);
+    }
+    tiles.appendChild(el);
+  }
+}
+
+function renderProvenance(doc) {
+  const p = document.getElementById("provenance");
+  const env = doc.environment;
+  const lines = [
+    `Results schema ${doc.schema}, generated ${doc.generated_at}`,
+    `Dataset "${doc.dataset.name}" — config hash ${doc.dataset.config_hash}, ` +
+      `noise model ${doc.dataset.config.noise_model}, seed ${doc.dataset.config.seed}`,
+    `qecbench ${env.qecbench_version}, Python ${env.python_version}, ${env.platform}` +
+      (env.processor ? `, ${env.processor}` : ""),
+    `Reproduce: qecbench generate --config configs/datasets/${doc.dataset.name}.yaml --out data && ` +
+      `qecbench benchmark --dataset data/${doc.dataset.name}`,
+  ];
+  for (const line of lines) {
+    const div = document.createElement("div");
+    const code = document.createElement("code");
+    code.textContent = line;
+    div.appendChild(code);
+    p.appendChild(div);
+  }
+}
+
+function render(doc) {
+  document.getElementById("app").style.display = "";
+  document.getElementById("load-error").style.display = "none";
+  renderTiles(doc);
+  renderLER(doc.results);
+  renderLatency(doc.results);
+  renderTable(doc.results);
+  renderProvenance(doc);
+}
+
+fetch("../results/benchmark_v1.json")
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(render)
+  .catch(() => {
+    document.getElementById("load-error").style.display = "";
+    document.getElementById("file-input").addEventListener("change", evt => {
+      const file = evt.target.files[0];
+      if (!file) return;
+      file.text().then(t => render(JSON.parse(t)));
+    });
+  });
+</script>
+</body>
+</html>
