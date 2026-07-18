@@ -3,7 +3,7 @@
 A reproducible benchmark suite for surface-code quantum error correction
 decoders, plus a lightweight neural decoder built for fast CPU inference.
 
-[**Interactive results dashboard**](dashboard/index.html) ·
+[**Interactive results dashboard**](https://lucas-maingi.github.io/qec-bench/) ·
 [Architecture](docs/architecture.md) ·
 [Reproducing the numbers](docs/reproducing.md) ·
 [Training](docs/training.md)
@@ -43,7 +43,8 @@ qecbench benchmark --dataset data/dev --decoders pymatching,fusion_blossom --out
 ```
 
 You now have logical-error-rate and latency numbers, with full provenance, in
-`runs/dev.json`. The complete pipeline — including training the neural decoder
+`runs/dev.json` — and `qecbench report runs/dev.json` renders them as
+markdown tables. The complete pipeline — including training the neural decoder
 locally on CPU — is three commands and documented in
 [docs/reproducing.md](docs/reproducing.md).
 

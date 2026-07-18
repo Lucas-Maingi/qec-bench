@@ -83,6 +83,23 @@ evaluated models on the same generated shots they trained on, and looked
 substantially better at d=5. The disjoint-seed train/benchmark split exposed
 that as leakage. That is what the rigor is *for*.
 
+Two follow-up experiments, both negative and both in the committed results:
+
+- **Capacity doesn't fix it.** A v2 model with 4× the parameters (512×256
+  hidden, 30 epochs, lower dropout) is *worse* than v1 in almost every cell —
+  its best validation epochs were 12/5/4 for d=3/5/7, i.e. it overfits the
+  fixed 600k-shot training budget almost immediately. At this data volume the
+  binding constraint is training data, not model size. That is precisely what
+  the free-GPU training tier (Kaggle, 30 h/week) is for, and both model
+  versions stay in the benchmark as the record of that finding.
+- **Batch throughput isn't streaming latency.** The harness measures both:
+  the MLP decodes 15 µs/shot *batched* at d=7 (faster than PyMatching's 45
+  µs), but a real-time decoder is called once per syndrome round, and
+  single-shot the picture inverts — p50 235 µs for the torch model against 47
+  µs for PyMatching, all per-call dispatch overhead. Fixing that (ONNX
+  export, TorchScript, or a hand-rolled forward pass) is inference
+  engineering, and now there's a measured number to engineer against.
+
 Three honest observations from the v1 numbers:
 
 1. **MWPM is a strong baseline and PyMatching is absurdly fast.** Sub-2µs
