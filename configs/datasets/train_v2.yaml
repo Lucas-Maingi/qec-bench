@@ -1,0 +1,12 @@
+# Large training set for the Kaggle GPU tier: 5x train_v1's shots per cell.
+# The v2 capacity experiment showed the 600k-sample budget of train_v1 is the
+# binding constraint (bigger models overfit it immediately); this is the
+# data-side answer. Distinct seed from train_v1 and benchmark_v1.
+name: train_v2
+code_task: surface_code:rotated_memory_z
+noise_model: circuit_depolarizing
+distances: [3, 5, 7]
+rounds: distance
+error_rates: [0.001, 0.002, 0.003, 0.005, 0.008, 0.01]
+shots: 500000
+seed: 424242

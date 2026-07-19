@@ -1,0 +1,11 @@
+# Neural decoder v3: the v2 architecture at the data budget it needed.
+# 3M samples per distance (train_v2); larger batches for GPU throughput.
+# Expect ~minutes/epoch on a Kaggle T4; not intended for laptop CPUs.
+distances: [3, 5, 7]
+hidden_sizes: [512, 256]
+dropout: 0.1
+epochs: 30
+batch_size: 1024
+learning_rate: 0.001
+val_fraction: 0.05
+seed: 2026
