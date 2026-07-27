@@ -103,13 +103,17 @@ benchmark was built to tell:
   near-optimal), reported honestly. All three versions stay in the benchmark as
   the record — the *method* (diagnose the bottleneck from the numbers, then fix
   the right thing) is the point, not any single model.
-- **Batch throughput isn't streaming latency.** The harness measures both:
-  the MLP decodes 15 µs/shot *batched* at d=7 (faster than PyMatching's 45
-  µs), but a real-time decoder is called once per syndrome round, and
-  single-shot the picture inverts — p50 235 µs for the torch model against 47
-  µs for PyMatching, all per-call dispatch overhead. Fixing that (ONNX
-  export, TorchScript, or a hand-rolled forward pass) is inference
-  engineering, and now there's a measured number to engineer against.
+- **Batch throughput isn't streaming latency — and ONNX fixes the gap.** The
+  harness measures both. Batched, the MLP is fast; but a real-time decoder is
+  called once per syndrome round, and single-shot the PyTorch model paid ~150 µs
+  of per-call dispatch overhead — far above PyMatching. Exporting the network to
+  ONNX and serving it through ONNX Runtime cut that **2–3×** (d=3/5/7 p=0.01:
+  148→45 µs, 153→59 µs, 153→76 µs) at **bit-identical** predictions, bringing
+  single-shot latency into PyMatching's range. Because the neural decoder's
+  latency is flat in code distance while matching's grows with syndrome density,
+  the ONNX path overtakes MWPM at larger distances. The exported model is the
+  shipped artifact: `load_pretrained(distance)` fetches it and decodes with no
+  PyTorch dependency.
 
 Three honest observations:
 
