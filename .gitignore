@@ -12,11 +12,13 @@ venv/
 .ruff_cache/
 .coverage
 
-# Generated data / artifacts (reproducible from configs; never committed)
+# Generated data / model artifacts (reproducible from configs; never committed).
+# Checkpoints are binary and large; training logs regenerate — keep both out of
+# git. The committed record of model performance is results/*.json.
 data/
 runs/
-weights/*.pt
-weights/*.onnx
+weights/
+weights_v*/
 
 # Editors / OS
 .vscode/
