@@ -50,4 +50,15 @@ def build_decoder(
                 raise ValueError("a neural checkpoint directory requires the code distance")
             path = path / f"d{distance}.pt"
         return NeuralDecoder.from_checkpoint(path)
+    if spec.startswith("onnx:"):
+        from pathlib import Path
+
+        from qecbench.decoders.onnx_decoder import ONNXDecoder
+
+        path = Path(spec.split(":", 1)[1])
+        if path.is_dir():
+            if distance is None:
+                raise ValueError("an onnx model directory requires the code distance")
+            path = path / f"d{distance}.onnx"
+        return ONNXDecoder.from_onnx(path)
     raise ValueError(f"unknown decoder {spec!r}; available: {available_decoders()}")

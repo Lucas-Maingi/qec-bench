@@ -19,6 +19,7 @@
     --series-3: #eda100; /* neural v1 */
     --series-4: #4a3aa7; /* neural v2 */
     --series-5: #008300; /* neural v3 */
+    --series-6: #eb6834; /* neural v3 (ONNX) */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -35,6 +36,7 @@
       --series-3: #c98500;
       --series-4: #9085e9;
       --series-5: #008300;
+      --series-6: #d95926;
     }
   }
   * { box-sizing: border-box; margin: 0; }
@@ -130,9 +132,12 @@
     <div class="card">
       <h2>Decode latency on CPU</h2>
       <p class="desc">
-        Mean time to decode one shot (batch decoding, single CPU core;
-        logarithmic axis). Measured on the same host that produced the accuracy
-        numbers — hardware details in the provenance footer.
+        Batch-decode throughput per shot (single CPU core; logarithmic axis).
+        The streaming figure a real-time decoder actually pays — single-shot
+        p50/p99 — is in the table below: exporting the neural model to ONNX
+        ("Neural v3 (ONNX)") cuts single-shot latency ~2–3× versus PyTorch,
+        into PyMatching's range. Measured on the same host as the accuracy
+        numbers; hardware in the provenance footer.
       </p>
       <div class="legend" id="legend-lat"></div>
       <div id="latency-plot"></div>
@@ -158,6 +163,7 @@ const DECODER_META = {
   "neural:weights":    { label: "Neural MLP v1", color: "var(--series-3)" },
   "neural:weights_v2": { label: "Neural MLP v2", color: "var(--series-4)" },
   "neural:weights_v3": { label: "Neural MLP v3", color: "var(--series-5)" },
+  "onnx:weights_v3":   { label: "Neural v3 (ONNX)", color: "var(--series-6)" },
 };
 function decoderMeta(name) {
   if (DECODER_META[name]) return DECODER_META[name];
@@ -313,6 +319,10 @@ function lerPanel(cells, decoders, distance, yDomain) {
 }
 
 function renderLER(results) {
+  // ONNX decoders are inference-latency variants of a neural model with
+  // identical accuracy; they belong in the latency plot, not as a duplicate
+  // accuracy curve.
+  results = results.filter(c => !c.decoder.startsWith("onnx"));
   const decoders = [...new Set(results.map(c => c.decoder))];
   buildLegend(document.getElementById("legend-ler"), decoders, "line");
   const distances = [...new Set(results.map(c => c.distance))].sort((a, b) => a - b);

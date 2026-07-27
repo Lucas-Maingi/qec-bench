@@ -35,6 +35,22 @@ def _cmd_train(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from qecbench.decoders.neural.export import export_checkpoint, export_directory
+
+    src = Path(args.checkpoint)
+    if src.is_dir():
+        outs = export_directory(src, args.out)
+        for o in outs:
+            print(f"exported {o}")
+    else:
+        out = args.out or str(src.with_suffix(".onnx"))
+        print(f"exported {export_checkpoint(src, out)}")
+    return 0
+
+
 def _cmd_benchmark(args: argparse.Namespace) -> int:
     from qecbench.eval import run_benchmark
 
@@ -69,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     tr.add_argument("--out", default="weights", help="checkpoint directory (default: weights)")
     tr.add_argument("--device", default=None, help="torch device (default: cuda if available)")
     tr.set_defaults(func=_cmd_train)
+
+    exp = sub.add_parser("export", help="export a neural checkpoint to ONNX (needs [export])")
+    exp.add_argument("--checkpoint", required=True, help="a .pt checkpoint or a directory of them")
+    exp.add_argument("--out", default=None, help="output .onnx path or directory")
+    exp.set_defaults(func=_cmd_export)
 
     bench = sub.add_parser("benchmark", help="run decoders over a generated dataset")
     bench.add_argument("--dataset", required=True, help="path to a generated dataset root")

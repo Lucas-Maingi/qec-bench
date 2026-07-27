@@ -27,6 +27,8 @@ dependencies = [
 [project.optional-dependencies]
 fusion = ["fusion-blossom>=0.2"]
 train = ["torch>=2.1"]
+onnx = ["onnxruntime>=1.16"]
+export = ["torch>=2.1", "onnx>=1.15", "onnxruntime>=1.16"]
 dev = ["pytest>=7.4", "ruff>=0.4"]
 
 [project.scripts]
