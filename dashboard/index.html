@@ -17,7 +17,8 @@
     --series-1: #2a78d6; /* pymatching */
     --series-2: #1baf7a; /* fusion_blossom */
     --series-3: #eda100; /* neural v1 */
-    --series-4: #008300; /* neural v2 */
+    --series-4: #4a3aa7; /* neural v2 */
+    --series-5: #008300; /* neural v3 */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -32,7 +33,8 @@
       --series-1: #3987e5;
       --series-2: #199e70;
       --series-3: #c98500;
-      --series-4: #008300;
+      --series-4: #9085e9;
+      --series-5: #008300;
     }
   }
   * { box-sizing: border-box; margin: 0; }
@@ -155,6 +157,7 @@ const DECODER_META = {
   fusion_blossom:     { label: "Fusion Blossom", color: "var(--series-2)" },
   "neural:weights":    { label: "Neural MLP v1", color: "var(--series-3)" },
   "neural:weights_v2": { label: "Neural MLP v2", color: "var(--series-4)" },
+  "neural:weights_v3": { label: "Neural MLP v3", color: "var(--series-5)" },
 };
 function decoderMeta(name) {
   if (DECODER_META[name]) return DECODER_META[name];

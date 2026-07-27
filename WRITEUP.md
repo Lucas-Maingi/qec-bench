@@ -64,34 +64,45 @@ circuit-level depolarizing noise, measured on a 6th-gen i7 laptop CPU;
 PyMatching and Fusion Blossom agree to within counting noise everywhere, so
 one MWPM column is shown):
 
+Neural column is the shipped model (v3 — see the progression below):
+
 | d | p | MWPM LER | Neural LER | MWPM µs/shot | Neural µs/shot |
 |---|-------|----------|-----------|------|------|
-| 3 | 0.001 | 7.8×10⁻⁴ | **6.6×10⁻⁴** | 0.3 | 5.0 |
-| 3 | 0.01  | 5.88×10⁻² | **5.74×10⁻²** | 1.1 | 3.2 |
-| 5 | 0.001 | **1.4×10⁻⁴** | 1.2×10⁻³ | 0.8 | 3.8 |
-| 5 | 0.01  | **8.30×10⁻²** | 2.06×10⁻¹ | 16.9 | 5.4 |
-| 7 | 0.001 | **3.5×10⁻⁵** | 8.0×10⁻³ | 4.9 | 9.0 |
-| 7 | 0.01  | **1.03×10⁻¹** | 4.29×10⁻¹ | 49.7 | 7.6 |
+| 3 | 0.001 | 7.8×10⁻⁴ | **6.2×10⁻⁴** | 0.2 | 10.9 |
+| 3 | 0.01  | 5.88×10⁻² | **5.45×10⁻²** | 1.3 | 8.7 |
+| 5 | 0.001 | **1.4×10⁻⁴** | 2.3×10⁻⁴ | 0.9 | 9.6 |
+| 5 | 0.01  | **8.30×10⁻²** | 1.34×10⁻¹ | 9.6 | 8.5 |
+| 7 | 0.001 | **3.5×10⁻⁵** | 2.9×10⁻³ | 2.5 | 12.1 |
+| 7 | 0.01  | **1.03×10⁻¹** | 3.60×10⁻¹ | 35.3 | 12.8 |
 
-The neural decoder wins every distance-3 cell outright, degrades to roughly
-2.5× worse at distance 5, and loses decisively at distance 7. Its latency is
-nearly flat in distance and error rate, while matching slows as syndromes get
-denser — at d=7 near threshold the MLP decodes ~6× faster than PyMatching.
+The neural decoder wins every distance-3 cell outright, sits within ~1.6× of
+MWPM at distance 5, and trails at distance 7 (where matching is near-optimal).
+Its latency is nearly flat in distance and error rate, while matching slows as
+syndromes get denser — at d=7 near threshold the MLP's batch decode is faster
+than PyMatching.
 
 One more result the pipeline itself produced: an earlier informal run had
 evaluated models on the same generated shots they trained on, and looked
 substantially better at d=5. The disjoint-seed train/benchmark split exposed
 that as leakage. That is what the rigor is *for*.
 
-Two follow-up experiments, both negative and both in the committed results:
+A three-model progression, all in the committed results, tells the story the
+benchmark was built to tell:
 
-- **Capacity doesn't fix it.** A v2 model with 4× the parameters (512×256
-  hidden, 30 epochs, lower dropout) is *worse* than v1 in almost every cell —
-  its best validation epochs were 12/5/4 for d=3/5/7, i.e. it overfits the
-  fixed 600k-shot training budget almost immediately. At this data volume the
-  binding constraint is training data, not model size. That is precisely what
-  the free-GPU training tier (Kaggle, 30 h/week) is for, and both model
-  versions stay in the benchmark as the record of that finding.
+- **v1 → v2: capacity alone doesn't help.** A v2 model with 4× the parameters
+  (512×256 hidden, lower dropout) is *worse* than v1 in almost every cell — its
+  best validation epochs were 12/5/4 for d=3/5/7, i.e. it overfits the fixed
+  600k-shot training budget almost immediately. The binding constraint is
+  training data, not model size.
+- **v2 → v3: more data is the lever.** Same 512×256 architecture, trained on a
+  5×-larger dataset (3M samples per distance) on a free Kaggle GPU. This is the
+  payoff the diagnosis predicted: at d=5, p=0.01 the logical error rate drops
+  from v1's 2.06×10⁻¹ to **1.34×10⁻¹** (the gap to MWPM narrows from ~2.5× to
+  ~1.6×); at d=7, p=0.01 from 4.29×10⁻¹ to **3.60×10⁻¹**; and at d=3 v3 beats
+  MWPM in every cell. It still trails MWPM at d=7 (where matching is
+  near-optimal), reported honestly. All three versions stay in the benchmark as
+  the record — the *method* (diagnose the bottleneck from the numbers, then fix
+  the right thing) is the point, not any single model.
 - **Batch throughput isn't streaming latency.** The harness measures both:
   the MLP decodes 15 µs/shot *batched* at d=7 (faster than PyMatching's 45
   µs), but a real-time decoder is called once per syndrome round, and
@@ -100,20 +111,21 @@ Two follow-up experiments, both negative and both in the committed results:
   export, TorchScript, or a hand-rolled forward pass) is inference
   engineering, and now there's a measured number to engineer against.
 
-Three honest observations from the v1 numbers:
+Three honest observations:
 
 1. **MWPM is a strong baseline and PyMatching is absurdly fast.** Sub-2µs
    per shot at d=3 on a 2016 laptop core. Any neural decoder pitch that
    ignores this latency bar is incomplete.
-2. **The small MLP is competitive near threshold at low distance** — it can
-   exploit correlations in the noise that the matching approximation throws
-   away — **and degrades at larger distance and low error rates**, where its
-   fixed training sample contains too few error events. Both regimes are in
-   the dashboard; neither is cherry-picked away.
+2. **The MLP is competitive-to-winning at low distance** — it exploits
+   correlations the matching approximation throws away — **and still trails at
+   distance 7**, where MWPM is near-optimal. More training data closed much of
+   the mid-distance gap (v1→v3) but did not erase the d=7 deficit. Every regime
+   is in the dashboard; none is cherry-picked away.
 3. **Engineering constraints are results too.** The shipped model decodes in
-   single-digit microseconds per shot on CPU, installs with `pip`, and trains
-   to reproduction in ~40 minutes on a laptop — no GPU required at these
-   distances. That is the niche the big-lab releases leave open.
+   ~10µs per shot on CPU and installs with `pip` — no GPU needed for inference.
+   Training the larger v3 uses a free Kaggle GPU (~30 min); the smaller v1
+   trains on a laptop CPU in ~40 minutes. That CPU-inference niche is what the
+   GPU-oriented big-lab releases leave open.
 
 ## The ML engineering underneath
 
