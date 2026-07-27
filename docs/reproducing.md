@@ -27,6 +27,35 @@ python -m http.server 8321   # from the repo root
 # open http://localhost:8321/dashboard/
 ```
 
+## Export the neural decoder to ONNX (optional)
+
+```bash
+pip install -e ".[export]"
+qecbench export --checkpoint weights_v3          # writes weights_v3/d{3,5,7}.onnx
+qecbench benchmark --dataset data/benchmark_v1 \
+    --decoders "pymatching,neural:weights_v3,onnx:weights_v3" \
+    --out results/benchmark_v1.json
+```
+
+The `onnx:<dir>` decoder serves the exported model via ONNX Runtime (no
+PyTorch needed) and is the shipped low-latency inference path. Its predictions
+are bit-identical to the PyTorch decoder; the win is single-shot latency.
+
+## Run a pretrained model without any of the above
+
+```bash
+pip install "qecbench[onnx] @ git+https://github.com/Lucas-Maingi/qec-bench"
+```
+
+```python
+from qecbench import load_pretrained
+from qecbench.pretrained import reference_circuit
+decoder = load_pretrained(distance=5)            # fetched from the GitHub release, cached
+circuit = reference_circuit(distance=5, error_rate=0.005)
+dets, obs = circuit.compile_detector_sampler().sample(20_000, separate_observables=True)
+print((decoder.decode_batch(dets) != obs).any(axis=1).mean())
+```
+
 ## What "reproducible" means here
 
 - **Data**: sampling is seeded per block from the config; the same config

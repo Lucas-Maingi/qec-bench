@@ -72,8 +72,14 @@ scores a shot as a logical error when any predicted observable differs from
 the true flip recorded at sampling time.
 
 The neural decoder does not fit `from_dem` (it needs trained weights), so the
-registry accepts spec strings: `pymatching`, `fusion_blossom`, or
-`neural:<checkpoint-or-directory>` with per-distance files `d{d}.pt`.
+registry accepts spec strings: `pymatching`, `fusion_blossom`,
+`neural:<checkpoint-or-directory>` with per-distance files `d{d}.pt`, or
+`onnx:<model-or-directory>` with `d{d}.onnx`. The ONNX path serves a
+SyndromeMLP exported with `qecbench export` through ONNX Runtime — no PyTorch
+dependency, and single-shot CPU latency ~2–3× lower than the PyTorch decoder at
+bit-identical accuracy. `qecbench.load_pretrained(distance)` fetches published
+models from the GitHub release and returns a ready `onnx:` (or `torch`)
+decoder.
 
 ## Determinism and provenance
 
